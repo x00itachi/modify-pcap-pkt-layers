@@ -44,11 +44,12 @@ options:
 #### Output pcap:
 ![image](https://github.com/x00itachi/modify-pcap-pkt-layers/assets/2780355/aae4d179-bccb-4192-9301-5ff19042b320)
 
-### [Example 4]: Removing layer based on offsets
+### [Example 4]: Removing layer based on offsets (Removing Juniper Ethernet layer using offsets)
 ```
 > python3 modify_layers.py -i jnpr-ethernet-layer.pcap -l "(0,12)"
 ```
 #### Input pcap:
 ![image](https://github.com/x00itachi/modify-pcap-pkt-layers/assets/2780355/c67359d3-8889-46de-b904-1be0d310a410)
 #### Output pcap:
+![image](https://github.com/x00itachi/modify-pcap-pkt-layers/assets/2780355/2ee34227-0b59-42a0-86f5-9b657362ba5d)
 
