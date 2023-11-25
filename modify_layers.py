@@ -114,6 +114,26 @@ class natrajPcapUtil(object):
                 dst=self.__ip_v4_v6_mapping__[dip]
                 )/ip_payload
         return newpkt
+    
+    @modifypcap
+    def ipv6_to_ipv4(self, pkt=None):
+        sip6, dip6 = pkt[IPv6].src, pkt[IPv6].dst
+        smac, dmac = pkt[Ether].src, pkt[Ether].dst
+        ip6_payload = pkt[IPv6].payload
+        if len(self.__ip_v4_v6_mapping__) == 0:
+            self.__ip_v4_v6_mapping__[sip6] = str(RandIP())
+            self.__ip_v4_v6_mapping__[dip6] = str(RandIP())
+        if len(self.__ip_mac_mapping__) == 0:
+            self.__ip_mac_mapping__[sip6] = smac
+            self.__ip_mac_mapping__[dip6] = dmac
+        newpkt = Ether(
+            src=self.__ip_mac_mapping__[sip6], 
+            dst=self.__ip_mac_mapping__[dip6]
+            )/IP(
+                src=self.__ip_v4_v6_mapping__[sip6],
+                dst=self.__ip_v4_v6_mapping__[dip6]
+                )/ip6_payload
+        return newpkt
 
 def main():
     sigutil = natrajPcapUtil()
@@ -145,6 +165,10 @@ def main():
                         action='store_true',
                         help='Changing the IPv4 pcap to IPv6.'
                         )
+    parser.add_argument("-4", "--toipv4",
+                        action='store_true',
+                        help='Changing the IPv6 pcap to IPv4.'
+                        )
     args = parser.parse_args()
 
     if args.input:
@@ -160,6 +184,8 @@ def main():
         sigutil.add_ethernet_layer()
     if args.toipv6:
         sigutil.ipv4_to_ipv6()
+    if args.toipv4:
+        sigutil.ipv6_to_ipv4()
 
 if __name__ == "__main__":
     main()
