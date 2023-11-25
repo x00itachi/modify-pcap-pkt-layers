@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-
+################################################################################
 __author__ = "Natraj G"
 __email__ = "natraj.rg@gmail.com"
-
+# Note: This tool was developed considering a single session. 
+#       In the future, it will be enhanced to support multi-session-based pcaps.
+#################################################################################
 import argparse
 from scapy.all import *
 import ast
@@ -12,12 +14,10 @@ class natrajPcapUtil(object):
         self.__givenpcap__ = None
         self.__modifiedpkts__ = None
         self.__rmlayer_offsets__ = None
-        self.__rand_smac__ = str(RandMAC())
-        self.__rand_dmac__ = str(RandMAC())
         self.__ip_mac_mapping__ = {}
+        self.__ip_v4_v6_mapping__ = {}
 
     def _fix_chksum_(self, pkt):
-        pkt = Ether(pkt)
         if IP in pkt:
             pkt[IP].chksum = None  # recalculate
             del pkt[IP].chksum     # delete cache
@@ -90,9 +90,29 @@ class natrajPcapUtil(object):
         ip_layer = IP(pkt_bytes)
         sip, dip = ip_layer[IP].src, ip_layer[IP].dst
         if len(self.__ip_mac_mapping__) == 0:
-            self.__ip_mac_mapping__[sip] = self.__rand_smac__
-            self.__ip_mac_mapping__[dip] = self.__rand_dmac__
+            self.__ip_mac_mapping__[sip] = str(RandMAC())
+            self.__ip_mac_mapping__[dip] = str(RandMAC())
         newpkt = Ether(src=self.__ip_mac_mapping__[sip], dst=self.__ip_mac_mapping__[dip])/ip_layer
+        return newpkt
+
+    @modifypcap
+    def ipv4_to_ipv6(self, pkt=None):
+        sip, dip = pkt[IP].src, pkt[IP].dst
+        smac, dmac = pkt[Ether].src, pkt[Ether].dst
+        ip_payload = pkt[IP].payload
+        if len(self.__ip_v4_v6_mapping__) == 0:
+            self.__ip_v4_v6_mapping__[sip] = str(RandIP6())
+            self.__ip_v4_v6_mapping__[dip] = str(RandIP6())
+        if len(self.__ip_mac_mapping__) == 0:
+            self.__ip_mac_mapping__[sip] = smac
+            self.__ip_mac_mapping__[dip] = dmac
+        newpkt = Ether(
+            src=self.__ip_mac_mapping__[sip], 
+            dst=self.__ip_mac_mapping__[dip]
+            )/IPv6(
+                src=self.__ip_v4_v6_mapping__[sip],
+                dst=self.__ip_v4_v6_mapping__[dip]
+                )/ip_payload
         return newpkt
 
 def main():
@@ -115,11 +135,15 @@ def main():
     parser.add_argument("-l", "--rmlayer", 
                         dest='rmlayer', 
                         metavar='(START,END)', 
-                        help='remove layers based on start & end offsets. Make sure selected layer not having dependency with its adjucent layers.'
+                        help='Remove layers based on start & end offsets. Make sure selected layer not having dependency with its adjucent layers.'
                         )
     parser.add_argument("-e", "--addeth",
                         action='store_true',
-                        help='Add ethernet layer'
+                        help='Add ethernet layer.'
+                        )
+    parser.add_argument("-6", "--toipv6",
+                        action='store_true',
+                        help='Changing the IPv4 pcap to IPv6.'
                         )
     args = parser.parse_args()
 
@@ -134,6 +158,8 @@ def main():
         sigutil.remove_layer()
     if args.addeth:
         sigutil.add_ethernet_layer()
+    if args.toipv6:
+        sigutil.ipv4_to_ipv6()
 
 if __name__ == "__main__":
     main()
