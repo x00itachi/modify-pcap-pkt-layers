@@ -12,6 +12,9 @@ class natrajPcapUtil(object):
         self.__givenpcap__ = None
         self.__modifiedpkts__ = None
         self.__rmlayer_offsets__ = None
+        self.__rand_smac__ = str(RandMAC())
+        self.__rand_dmac__ = str(RandMAC())
+        self.__ip_mac_mapping__ = {}
 
     def _fix_chksum_(self, pkt):
         pkt = Ether(pkt)
@@ -77,6 +80,20 @@ class natrajPcapUtil(object):
         start_ofs, end_ofs = ast.literal_eval(self.__rmlayer_offsets__)
         newpkt = pkt_bytes[:start_ofs] + pkt_bytes[end_ofs:]
         return newpkt
+    
+    @modifypcap
+    def add_ethernet_layer(self, pkt=None):
+        """
+        Currently created to cover only IPv4 sublayer.
+        """
+        pkt_bytes = bytes(pkt)
+        ip_layer = IP(pkt_bytes)
+        sip, dip = ip_layer[IP].src, ip_layer[IP].dst
+        if len(self.__ip_mac_mapping__) == 0:
+            self.__ip_mac_mapping__[sip] = self.__rand_smac__
+            self.__ip_mac_mapping__[dip] = self.__rand_dmac__
+        newpkt = Ether(src=self.__ip_mac_mapping__[sip], dst=self.__ip_mac_mapping__[dip])/ip_layer
+        return newpkt
 
 def main():
     sigutil = natrajPcapUtil()
@@ -98,7 +115,12 @@ def main():
     parser.add_argument("-l", "--rmlayer", 
                         dest='rmlayer', 
                         metavar='(START,END)', 
-                        help='remove layers based on start & end offsets. Make sure selected layer not having dependency with its adjucent layers.')
+                        help='remove layers based on start & end offsets. Make sure selected layer not having dependency with its adjucent layers.'
+                        )
+    parser.add_argument("-e", "--addeth",
+                        action='store_true',
+                        help='Add ethernet layer'
+                        )
     args = parser.parse_args()
 
     if args.input:
@@ -110,6 +132,8 @@ def main():
     if args.rmlayer:
         sigutil.__rmlayer_offsets__ = args.rmlayer
         sigutil.remove_layer()
+    if args.addeth:
+        sigutil.add_ethernet_layer()
 
 if __name__ == "__main__":
     main()
