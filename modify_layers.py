@@ -3,33 +3,37 @@
 ################################################################################
 __author__ = "Natraj G"
 __email__ = "natraj.rg@gmail.com"
-# Note: This tool was designed with a single session in mind. 
-#       In the future, it will be improved to accommodate multi-session-based PCAPs. 
+# Note: This tool was designed with a single session in mind.
+#       In the future, it will be improved to accommodate multi-session-based PCAPs.
 #################################################################################
 
 import argparse
-from lib_natrajPcapUtil import natrajPcapUtil
+from lib_natrajPcapUtil import NatrajPcapUtil
 
 def main():
-    sigutil = natrajPcapUtil()
+    """
+    A script for modifying PCAP files.
+    """
+    sigutil = NatrajPcapUtil()
 
     parser = argparse.ArgumentParser(description="A script for modifying PCAP files.")
-    parser.add_argument("-i", "--input", 
-                        dest='input', 
-                        metavar='PCAP', 
+    parser.add_argument("-i", "--input",
+                        dest='input',
+                        metavar='PCAP',
                         help='Input pcap file.'
                         )
-    parser.add_argument("-j", "--rmjnprlayer", 
-                        action='store_true', 
-                        help='Remove the Juniper Ethernet layer, located 12 bytes from the beginning of the packet.'
+    parser.add_argument("-j", "--rmjnprlayer",
+                        action='store_true',
+                        help='Remove the Juniper Ethernet layer, \
+                            located 12 bytes from the beginning of the packet.'
                         )
-    parser.add_argument("-d", "--dot1q", 
-                        action='store_true', 
+    parser.add_argument("-d", "--dot1q",
+                        action='store_true',
                         help='Remove the VLAN 802.1Q layer.'
                         )
-    parser.add_argument("-l", "--rmlayer", 
-                        dest='rmlayer', 
-                        metavar='(START,END)', 
+    parser.add_argument("-l", "--rmlayer",
+                        dest='rmlayer',
+                        metavar='(START,END)',
                         help='Remove layers/bytes using start and end offsets'
                         )
     parser.add_argument("-e", "--addeth",
@@ -43,6 +47,10 @@ def main():
     parser.add_argument("-4", "--toipv4",
                         action='store_true',
                         help='Converting the IPv6 pcap to IPv4. Utilize random IPv4 addresses.'
+                        )
+    parser.add_argument("-f", "--fixchksum",
+                        action='store_true',
+                        help='Explicitly fix the checksum of the pcap. Implicitly, this fix applies to all other features/arguments.'
                         )
     args = parser.parse_args()
 
@@ -61,6 +69,8 @@ def main():
         sigutil.ipv4_to_ipv6()
     if args.toipv4:
         sigutil.ipv6_to_ipv4()
+    if args.fixchksum:
+        sigutil.fix_pcap_chksum()
 
 if __name__ == "__main__":
     main()

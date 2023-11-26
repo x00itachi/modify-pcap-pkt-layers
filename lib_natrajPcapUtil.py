@@ -1,8 +1,8 @@
+import ast, os
 from scapy.all import *
 
-import ast
-
-class natrajPcapUtil(object):
+class NatrajPcapUtil:
+    """Pcap Utility class."""
     def __init__(self):
         self.__givenpcap__ = None
         self.__modifiedpkts__ = None
@@ -11,6 +11,9 @@ class natrajPcapUtil(object):
         self.__ip_v4_v6_mapping__ = {}
 
     def _fix_chksum_(self, pkt):
+        """Fix packet checksum."""
+        if type(pkt) is bytes:
+            pkt = Ether(pkt)
         if IP in pkt:
             pkt[IP].chksum = None  # recalculate
             del pkt[IP].chksum     # delete cache
@@ -22,14 +25,23 @@ class natrajPcapUtil(object):
             del pkt[TCP].chksum
         return pkt
 
+    def __read_pcapfile__(self, pcapfile):
+        """Read provided pcap file."""
+        try:
+            pkts = rdpcap(pcapfile)
+        except FileNotFoundError:
+            print("File not found:", pcapfile)
+        return pkts
+
     @staticmethod
     def modifypcap(func):
+        """Decorator function, used to trigger before any feature."""
         def inner(cls_instance, pcapfile=None):
             pcapfile = pcapfile or cls_instance.__givenpcap__
             if cls_instance.__modifiedpkts__:
                 pkts = cls_instance.__modifiedpkts__
             else:
-                pkts = rdpcap(pcapfile)
+                pkts = cls_instance.__read_pcapfile__(pcapfile)
             newpkts = []
             for pkt in pkts:
                 newpkt = func(cls_instance, pkt)
@@ -39,11 +51,17 @@ class natrajPcapUtil(object):
         return inner
 
     def __writepcap__(self, newpkts):
+        """Write newpkts to new pcap."""
         self.__modifiedpkts__ = newpkts  # used while calling more than one switch.
-        wrpcap('modified_%s' % self.__givenpcap__, newpkts)
+        new_pcapname = f'modified_{os.path.basename(self.__givenpcap__)}'
+        existing_pcap_dir = os.path.dirname(self.__givenpcap__)
+        newfilepath = os.path.join(existing_pcap_dir, new_pcapname)
+        wrpcap(newfilepath, newpkts)
 
     @modifypcap
     def remove_juniper_ethernet_layer(self, pkt=None):
+        """(-j) Remove the Juniper Ethernet layer, 
+                    located 12 bytes from the beginning of the packet."""
         juniper_header_length = 12
         juniper_header_magic_bytes = b'MGC'
         if bytes(pkt).startswith(juniper_header_magic_bytes):
@@ -54,6 +72,7 @@ class natrajPcapUtil(object):
 
     @modifypcap
     def remove_dot1q_layer(self, pkt=None):
+        """(-d) Remove the VLAN 802.1Q layer."""
         if type(pkt) is bytes:
             pkt = Ether(pkt)
         if type(pkt) is Ether:
@@ -69,6 +88,7 @@ class natrajPcapUtil(object):
 
     @modifypcap
     def remove_layer(self, pkt=None):
+        """(-l (START,END)) Remove layers/bytes using start and end offsets"""
         pkt_bytes = bytes(pkt)
         start_ofs, end_ofs = ast.literal_eval(self.__rmlayer_offsets__)
         newpkt = pkt_bytes[:start_ofs] + pkt_bytes[end_ofs:]
@@ -77,7 +97,8 @@ class natrajPcapUtil(object):
     @modifypcap
     def add_ethernet_layer(self, pkt=None):
         """
-        Currently created to cover only IPv4 sublayer.
+        (-e) Add an Ethernet layer and utilize random MAC addresses.
+        Note: Currently created to cover only IPv4 sublayer.
         """
         pkt_bytes = bytes(pkt)
         ip_layer = IP(pkt_bytes)
@@ -90,6 +111,7 @@ class natrajPcapUtil(object):
 
     @modifypcap
     def ipv4_to_ipv6(self, pkt=None):
+        """(-6) Converting the IPv4 pcap to IPv6. Utilize random IPv6 addresses."""
         sip, dip = pkt[IP].src, pkt[IP].dst
         smac, dmac = pkt[Ether].src, pkt[Ether].dst
         ip_payload = pkt[IP].payload
@@ -110,6 +132,7 @@ class natrajPcapUtil(object):
 
     @modifypcap
     def ipv6_to_ipv4(self, pkt=None):
+        """(-4) Converting the IPv6 pcap to IPv4. Utilize random IPv4 addresses."""
         sip6, dip6 = pkt[IPv6].src, pkt[IPv6].dst
         smac, dmac = pkt[Ether].src, pkt[Ether].dst
         ip6_payload = pkt[IPv6].payload
@@ -127,3 +150,8 @@ class natrajPcapUtil(object):
                 dst=self.__ip_v4_v6_mapping__[dip6]
                 )/ip6_payload
         return newpkt
+
+    @modifypcap
+    def fix_pcap_chksum(self, pkt=None):
+        """(-f) Explicitly fix the checksum of the pcap. Implicitly, this fix applies to all other features/arguments."""
+        return pkt
